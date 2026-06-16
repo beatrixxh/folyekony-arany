@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Folyékony Arany - Üzemanyagárak elemzése</title>
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<style>
+:root {
+  --bg: #0f2027;
+  --bg2: #203a43;
+  --bg3: #2c5364;
+  --card: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.14);
+  --text: #f5f5f5;
+  --muted: rgba(245, 245, 245, 0.82);
+  --accent: #ffcc00;
+  --accent2: #ff9f1c;
+  --diesel-color: #38bdf8;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(120deg, var(--bg), var(--bg2), var(--bg3));
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+body.is-locked {
+  overflow: hidden;
+}
+
+header.hero {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 4rem 1.5rem 2.5rem;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+header.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 500px at 20% 20%, rgba(255, 204, 0, 0.14), transparent 60%),
+    radial-gradient(900px 500px at 80% 30%, rgba(255, 159, 28, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 60% 90%, rgba(255, 255, 255, 0.08), transparent 60%);
+  pointer-events: none;
+}
+
+.hero-inner {
+  position: relative;
+  max-width: 1100px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.hero-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 2.25rem 2.35rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  backdrop-filter: blur(10px);
+  text-align: left;
+}
+
+.hero h1 {
+  font-size: clamp(2.2rem, 3.8vw, 3.8rem);
+  margin: 0 0 0.75rem;
+  letter-spacing: 0.3px;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.hero p {
+  margin: 0 0 1.5rem 0;
+  line-height: 1.7;
+  opacity: 0.95;
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+.hero-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.9rem 1.6rem;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), #ffd86b);
+  color: #111;
+  box-shadow: 0 4px 15px rgba(255, 204, 0, 0.35);
+}
+
+.btn:hover {
+  transform: scale(1.04);
+}
+
+.hero-visual {
+  display: grid;
+  place-items: center;
+}
+
+.hero-visual img {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  border-radius: 18px;
+  object-fit: cover;
+  box-shadow: 0 14px 35px rgba(0,0,0,0.45);
+}
+
+.scroll-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  opacity: 0.78;
+  font-size: 0.95rem;
+}
+
+main {
+  padding: 0 0 2rem;
+}
+
+section#bevezeto, section#station-section, section#station-intro {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 4rem clamp(1rem, 4vw, 4rem) 2rem;
+  box-sizing: border-box;
+}
+
+section#station-intro {
+  padding-bottom: 0;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: 2.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 4vw, 4rem) 2rem;
+  box-sizing: border-box;
+}
+
+.viz-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.viz-card h2,
+#bevezeto h2,
+#station-section h2 {
+  color: var(--accent);
+  margin-top: 0;
+}
+
+.viz-card p,
+#bevezeto p,
+#station-section p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.chart {
+  width: 100%;
+  min-height: 380px;
+  margin-bottom: 1.5rem;
+}
+
+/* ==========================================
+   MINI-JÁTÉKOK STÍLUSAI
+   ========================================== */
+.mini-game {
+  background: rgba(0, 0, 0, 0.25);
+  border-top: 2px dashed var(--border);
+  margin-top: auto;
+  padding: 1.25rem 1rem 0.5rem;
+  border-radius: 8px;
+}
+
+.mini-game h4 {
+  margin: 0 0 0.75rem 0;
+  color: var(--accent2);
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.game-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.inline-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.inline-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--accent);
+}
+
+.inline-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.inline-feedback {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.inline-feedback.success {
+  background: rgba(46, 204, 113, 0.15);
+  border: 1px solid #2ecc71;
+  color: #58d68d;
+}
+
+.inline-feedback.error {
+  background: rgba(231, 76, 60, 0.15);
+  border: 1px solid #e74c3c;
+  color: #f1948a;
+}
+
+/* ==========================================
+   TÖLTŐPISZTOLYOK & BENZINKÚT STÍLUSOK
+   ========================================== */
+.pump-station {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-top: 2rem;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .pump-station { grid-template-columns: 1fr; }
+}
+
+.nozzles-zone {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: rgba(0,0,0,0.4);
+  padding: 2rem 1rem;
+  border-radius: 12px;
+  border: 1px inset rgba(255,255,255,0.1);
+}
+
+.nozzle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.2s;
+  padding: 10px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 8px;
+}
+.nozzle:active { cursor: grabbing; transform: scale(0.95); }
+
+.gun-body {
+  width: 45px;
+  height: 65px;
+  border-radius: 8px 15px 5px 5px;
+  position: relative;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.6);
+}
+.nozzle.benzin .gun-body { background: #e6b800; border: 2px solid #b38f00; }
+.nozzle.diesel .gun-body { background: #0284c7; border: 2px solid #0369a1; }
+
+.gun-body::before {
+  content: '';
+  position: absolute;
+  top: -22px;
+  left: 14px;
+  width: 10px;
+  height: 30px;
+  background: linear-gradient(90deg, #999, #fff, #666);
+  border-radius: 3px;
+  transform: rotate(-15deg);
+}
+
+.gun-body::after {
+  content: '';
+  position: absolute;
+  top: -35px;
+  left: 6px;
+  width: 7px;
+  height: 20px;
+  background: #aaa;
+  border-radius: 2px;
+  transform: rotate(-35deg);
+}
+
+.gun-trigger-guard {
+  position: absolute;
+  bottom: 10px;
+  right: -12px;
+  width: 18px;
+  height: 30px;
+  border: 3px solid #333;
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+  background: transparent;
+}
+
+.gun-hose {
+  width: 12px;
+  height: 50px;
+  background: linear-gradient(90deg, #111, #333, #111);
+  border-radius: 3px;
+  margin-top: -2px;
+  position: relative;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+}
+
+.nozzle text-label {
+  margin-top: 10px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+.nozzle.benzin text-label { color: var(--accent); }
+.nozzle.diesel text-label { color: var(--diesel-color); }
+
+.nozzle price-label {
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+/* Autók sávja */
+.cars-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.car-slot {
+  background: rgba(255,255,255,0.03);
+  border: 2px dashed rgba(255,255,255,0.2);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  transition: background 0.3s, border-color 0.3s;
+}
+.car-slot.hovered {
+  border-color: var(--accent2);
+  background: rgba(255, 159, 28, 0.1);
+}
+
+.car-visual-box {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.car-img {
+  width: 110px;
+  height: 70px;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.car-info {
+  display: flex;
+  flex-direction: column;
+}
+.car-name { font-weight: bold; font-size: 1.1rem; color: #fff; }
+.car-type-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.3rem;
+  width: fit-content;
+  font-weight: bold;
+}
+.benzin-badge { background: rgba(255,204,0,0.2); color: var(--accent); border: 1px solid var(--accent); }
+.diesel-badge { background: rgba(56,189,248,0.2); color: var(--diesel-color); border: 1px solid var(--diesel-color); }
+
+.fuel-cap {
+  width: 55px;
+  height: 55px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  background: rgba(0,0,0,0.4);
+  flex-shrink: 0;
+}
+
+/* Számláló Kijelző */
+.station-display {
+  grid-column: 1 / -1;
+  background: #000;
+  border: 3px solid #333;
+  font-family: 'Courier New', monospace;
+  padding: 1rem;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-around;
+  color: #00ff00;
+  text-shadow: 0 0 5px #00ff00;
+  font-size: 1.4rem;
+}
+.display-block span { color: #fff; font-size: 0.85rem; display: block; margin-bottom: 0.2rem;}
+
+.game-msg {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 0.8rem;
+  border-radius: 8px;
+  font-weight: bold;
+  display: none;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+footer {
+  text-align: center;
+  padding: 3rem 2rem;
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-card">
+      <h1>Folyékony Arany</h1>
+      <p>Hogyan mozgatják a globális események a romániai üzemanyagárakat?</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#vizualizaciok" id="view-viz-btn">Adatok elemzése ↓</a>
+      </div>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <img
+        src="https://cdn.kemma.hu/2025/10/SrhwepWQeUH69Yst-a1AWuMMqfu_vQXU-wMRJJAzt3o/fit/1200/800/no/1/aHR0cHM6Ly9jbXNjZG4uYXBwLmNvbnRlbnQucHJpdmF0ZS9jb250ZW50LzVmZWIwMjUyNmZhODRlMDU4NWFjNDBiZDM1ZTQyNmYx.jpg"
+        alt="Üzemanyagárak változása"
+      />
+    </div>
+  </div>
+  <div class="scroll-hint">Görgess le az elemzéshez ↓</div>
+</header>
+
+<main id="vizualizaciok">
+
+  <section id="bevezeto">
+    <h2>Bevezető</h2>
+    <p>
+      Ez az oldal a romániai üzemanyagárak alakulását mutatja be modern, interaktív vizualizációkkal.
+      A fókusz a benzin- és dízelárak időbeli változásán, az energia-infláció hatásán, valamint a
+      nemzetközi események és a helyi fogyasztói árak kapcsolatán van.
+    </p>
+  </section>
+
+  <div class="viz-grid">
+    
+    <div class="viz-card">
+      <h2>Dízel árak alakulása Romániában</h2>
+      <p>Az idősoros grafikon a romániai dízelárak mozgását mutatja, és jól láthatóvá teszi a válságokhoz köthető kiugrásokat.</p>
+      <div id="viz1" class="chart"></div>
+      
+      <div class="mini-game">
+        <h4>🔍 Grafikon Nyomozás: Mi történt 2020-ban?</h4>
+        <div class="game-options">
+          <button class="inline-btn" onclick="playGame(1, false)">A román állam teljesen eltörölte a gázolaj áfáját erre az évre.</button>
+          <button class="inline-btn" onclick="playGame(1, true)">A globális COVID-lezárások miatt a kőolaj iránti kereslet összeomlott.</button>
+        </div>
+        <div id="feedback-1" class="inline-feedback"></div>
+      </div>
+    </div>
+
+    <div class="viz-card">
+      <h2>Benzin és dízel összehasonlítása</h2>
+      <p>Ez a diagram összeveti a két legfontosabb üzemanyagtípus árváltozását ugyanazon időszakban.</p>
+      <div id="viz2" class="chart"></div>
+
+      <div class="mini-game">
+        <h4>🔍 Grafikon Nyomozás: Miért előzte be tartósan a dízel a benzint?</h4>
+        <div class="game-options">
+          <button class="inline-btn" onclick="playGame(2, true)">Az ukrajnai háború miatti orosz importkiesés tartós gázolajhiányt és magasabb dízelárakat okozott Európában.</button>
+          <button class="inline-btn" onclick="playGame(2, false)">A benzines autók használatát teljesen betiltották a romániai nagyvárosokban.</button>
+        </div>
+        <div id="feedback-2" class="inline-feedback"></div>
+      </div>
+    </div>
+
+    <div class="viz-card">
+      <h2>Energia-infláció Romániában</h2>
+      <p>Az energiaárak inflációja erősen befolyásolja az üzemanyagárakat, különösen válsághelyzetek idején.</p>
+      <div id="viz3" class="chart"></div>
+
+      <div class="mini-game">
+        <h4>🔍 Grafikon Nyomozás: Miért lőtt ki az infláció 2022-ben?</h4>
+        <div class="game-options">
+          <button class="inline-btn" onclick="playGame(3, false)">A lakosság hirtelen kétszer annyi áramot kezdett fogyasztani, mint korábban.</button>
+          <button class="inline-btn" onclick="playGame(3, true)">A földgáz és villamos energia világpiaci ára az egekbe szökött az európai gázkrízis miatt.</button>
+        </div>
+        <div id="feedback-3" class="inline-feedback"></div>
+      </div>
+    </div>
+
+    <div class="viz-card">
+      <h2>Románia üzemanyagár-indexe</h2>
+      <p>Ez a mutató egy egyszerű, összehasonlítható indexben jeleníti meg az árak emelkedését 2017 óta.</p>
+      <div id="viz4" class="chart"></div>
+
+      <div class="mini-game">
+        <h4>🔍 Grafikon Nyomozás: Miért maradt magasan az index?</h4>
+        <div class="game-options">
+          <button class="inline-btn" onclick="playGame(4, true)">A makacs általános infláció és a romániai jövedékiadó-emelések nem engedik vissza az árakat.</button>
+          <button class="inline-btn" onclick="playGame(4, false)">Az olajvállalatok teljesen kifogytak a finomítható kőolajból.</button>
+        </div>
+        <div id="feedback-4" class="inline-feedback"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <section id="station-intro">
+    <div style="background: linear-gradient(135deg, rgba(255, 159, 28, 0.1), rgba(0,0,0,0.2)); border: 1px solid var(--border); border-radius: 18px; padding: 2rem; backdrop-filter: blur(10px);">
+      <h3 style="color: var(--accent2); margin-top: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.4rem;">
+        📊 Piaci Pillanatkép: Miért ennyi az annyi?
+      </h3>
+      <p style="color: var(--muted); line-height: 1.7; margin-bottom: 1.5rem;">
+        A fenti adatokból tisztán kirajzolódik, hogy a geopolitikai feszültségek, a finomítói kapacitások szűkössége és a belföldi adóemelések láncreakciót indítottak el. 
+        <strong>2026 júniusára Románia történetének egyik legmagasabb üzemanyagár-szintjével nézünk szembe.</strong> 
+        Mielőtt kipróbálnád az interaktív szimulációt, tekintsd át a jelenlegi piaci sarokszámokat:
+      </p>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 0.5rem;">
+        <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--accent);">
+          <span style="font-size: 0.8rem; color: #aaa; display: block; text-transform: uppercase;">Standard Benzin E95</span>
+          <strong style="font-size: 1.6rem; color: var(--accent); display: block; margin-top: 0.3rem;">9.14 RON / L</strong>
+          <span style="font-size: 0.85rem; color: #f87171;">📈 Történelmi csúcs közelében</span>
+        </div>
+        <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--diesel-color);">
+          <span style="font-size: 0.8rem; color: #aaa; display: block; text-transform: uppercase;">Standard Dízel</span>
+          <strong style="font-size: 1.6rem; color: var(--diesel-color); display: block; margin-top: 0.3rem;">9.50 RON / L</strong>
+          <span style="font-size: 0.85rem; color: #f87171;">⚠️ Magas importnyomás</span>
+        </div>
+        <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; border-left: 4px solid #2ecc71;">
+          <span style="font-size: 0.8rem; color: #aaa; display: block; text-transform: uppercase;">Árindex (2017 = 100)</span>
+          <strong style="font-size: 1.6rem; color: #2ecc71; display: block; margin-top: 0.3rem;">198 pont</strong>
+          <span style="font-size: 0.85rem; color: #aaa;">Majdnem duplázódás 9 év alatt</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="station-section">
+    <h2>⛽ Interaktív Benzinkút: Tankolás 2026 Júniusában</h2>
+    <p>Húzd a megfelelő töltőpisztolyt a választott autó üzemanyag-nyílására a tankolás elindításához!</p>
+    
+    <div class="pump-station">
+      
+      <div class="station-display">
+        <div class="display-block"><span>LITER:</span><div id="disp-liters">0.00 L</div></div>
+        <div class="display-block"><span>LITERÁR (RON):</span><div id="disp-rate">0.00 RON</div></div>
+        <div class="display-block"><span>FIZETENDŐ:</span><div id="disp-total" style="color: #ffcc00;">0.00 RON</div></div>
+      </div>
+
+      <div id="game-alert" class="game-msg"></div>
+
+      <div class="nozzles-zone">
+        <div class="nozzle benzin" draggable="true" id="nozzle-benzin">
+          <div class="gun-body"><div class="gun-trigger-guard"></div></div>
+          <div class="gun-hose"></div>
+          <text-label>BENZIN</text-label>
+          <price-label>9.14 RON</price-label>
+        </div>
+
+        <div class="nozzle diesel" draggable="true" id="nozzle-diesel">
+          <div class="gun-body"><div class="gun-trigger-guard"></div></div>
+          <div class="gun-hose"></div>
+          <text-label>DÍZEL</text-label>
+          <price-label>9.50 RON</price-label>
+        </div>
+      </div>
+
+      <div class="cars-zone">
+        <div class="car-slot" id="slot-benzin" data-target="benzin">
+          <div class="car-visual-box">
+            <img src="https://images.unsplash.com/photo-1542282088-fe8426682b8f?auto=format&fit=crop&w=200&q=80" alt="Benzines Opel Astra" class="car-img">
+            <div class="car-info">
+              <span class="car-name">Opel Astra (Benzines)</span>
+              <span class="car-type-badge benzin-badge">Benzin E95 tank</span>
+            </div>
+          </div>
+          <div class="fuel-cap">TANK</div>
+        </div>
+
+        <div class="car-slot" id="slot-diesel" data-target="diesel">
+          <div class="car-visual-box">
+            <img src="https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&w=200&q=80" alt="Dízeles Audi A4" class="car-img">
+            <div class="car-info">
+              <span class="car-name">Audi A4 (Dízeles)</span>
+              <span class="car-type-badge diesel-badge">Dízel Standard tank</span>
+            </div>
+          </div>
+          <div class="fuel-cap">TANK</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    <p>© 2026 – Folyékony Arany | Üzemanyagár-elemzés</p>
+  </footer>
+</main>
+
+<script>
+const baseConfig = {
+  "autosize": {"type": "fit", "contains": "padding"},
+  "view": { "stroke": null },
+  "axis": { "grid": true, "gridColor": "rgba(255,255,255,0.08)" }
+};
+
+const dieselPrices = {
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": 380,
+  "background": "transparent",
+  "title": { "text": "Dízelárak alakulása Romániában", "fontSize": 14, "fontWeight": "bold", "color": "#f1f5f9" },
+  "data": {
+    "values": [
+      { "date": "2017", "price": 4.45 },
+      { "date": "2018", "price": 4.78 },
+      { "date": "2019", "price": 5.12 },
+      { "date": "2020", "price": 4.65 },
+      { "date": "2021", "price": 5.78 },
+      { "date": "2022", "price": 8.41 },
+      { "date": "2023", "price": 7.34 },
+      { "date": "2024", "price": 7.62 },
+      { "date": "2026.06", "price": 9.50 }
+    ]
+  },
+  "mark": { "type": "area", "color": "#38bdf8", "opacity": 0.25, "line": { "color": "#38bdf8", "strokeWidth": 3 } },
+  "encoding": {
+    "x": { "field": "date", "type": "ordinal", "title": "Év", "axis": { "labelAngle": -45, "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" } },
+    "y": { "field": "price", "type": "quantitative", "title": "Ár (RON/liter)", "axis": { "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" } },
+    "tooltip": [
+      { "field": "date", "type": "ordinal", "title": "Év" },
+      { "field": "price", "type": "quantitative", "title": "Ár (RON/liter)", "format": ".2f" }
+    ]
+  },
+  "config": baseConfig
+};
+
+const fuelCompare = {
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": 380,
+  "background": "transparent",
+  "title": { "text": "Benzin és dízel összehasonlítása", "fontSize": 14, "fontWeight": "bold", "color": "#f1f5f9" },
+  "data": {
+    "values": [
+      { "year": "2017", "type": "Benzin", "value": 4.90 },
+      { "year": "2017", "type": "Dízel", "value": 4.45 },
+      { "year": "2018", "type": "Benzin", "value": 5.12 },
+      { "year": "2018", "type": "Dízel", "value": 4.78 },
+      { "year": "2019", "type": "Benzin", "value": 5.38 },
+      { "year": "2019", "type": "Dízel", "value": 5.12 },
+      { "year": "2020", "type": "Benzin", "value": 4.92 },
+      { "year": "2020", "type": "Dízel", "value": 4.65 },
+      { "year": "2021", "type": "Benzin", "value": 6.12 },
+      { "year": "2021", "type": "Dízel", "value": 5.78 },
+      { "year": "2022", "type": "Benzin", "value": 7.92 }, 
+      { "year": "2022", "type": "Dízel", "value": 8.41 },
+      { "year": "2023", "type": "Benzin", "value": 6.85 },
+      { "year": "2023", "type": "Dízel", "value": 7.34 },
+      { "year": "2024", "type": "Benzin", "value": 7.18 },
+      { "year": "2024", "type": "Dízel", "value": 7.62 },
+      { "year": "2026.06", "type": "Benzin", "value": 9.14 },
+      { "year": "2026.06", "type": "Dízel", "value": 9.50 }
+    ]
+  },
+  "mark": { "type": "line", "point": true, "strokeWidth": 3 },
+  "encoding": {
+    "x": { "field": "year", "type": "ordinal", "title": "Év", "axis": { "labelAngle": -45, "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" } },
+    "y": { "field": "value", "type": "quantitative", "title": "Ár (RON/liter)", "axis": { "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" } },
+    "color": {
+      "field": "type",
+      "type": "nominal",
+      "scale": { "domain": ["Benzin", "Dízel"], "range": ["#ffcc00", "#38bdf8"] },
+      "legend": { "title": "Üzemanyag", "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" }
+    },
+    "tooltip": [
+      { "field": "year", "type": "ordinal", "title": "Év" },
+      { "field": "type", "type": "nominal", "title": "Típus" },
+      { "field": "value", "type": "quantitative", "title": "Ár (RON/liter)", "format": ".2f" }
+    ]
+  },
+  "config": baseConfig
+};
+
+const energyInflation = {
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": 380,
+  "background": "transparent",
+  "title": { "text": "Energia-infláció Romániában", "fontSize": 14, "fontWeight": "bold", "color": "#f1f5f9" },
+  "data": {
+    "values": [
+      { "year": 2019, "Electricity": 3.2, "Gas": 4.1, "Liquid fuels": 2.7 },
+      { "year": 2020, "Electricity": 2.4, "Gas": 3.2, "Liquid fuels": -1.5 },
+      { "year": 2021, "Electricity": 10.6, "Gas": 12.8, "Liquid fuels": 7.9 },
+      { "year": 2022, "Electricity": 27.4, "Gas": 34.2, "Liquid fuels": 28.8 },
+      { "year": 2023, "Electricity": 13.1, "Gas": 9.5, "Liquid fuels": 6.4 },
+      { "year": 2024, "Electricity": 8.8, "Gas": 7.3, "Liquid fuels": 4.9 },
+      { "year": 2026, "Electricity": 7.9, "Gas": 6.8, "Liquid fuels": 5.2 }
+    ]
+  },
+  "transform": [{ "fold": ["Electricity", "Gas", "Liquid fuels"], "as": ["Típus", "Érték"] }],
+  "mark": { "type": "line", "point": true, "strokeWidth": 3 },
+  "encoding": {
+    "x": { "field": "year", "type": "ordinal", "title": "Év", "axis": { "labelAngle": -45, "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" } },
+    "y": { "field": "Érték", "type": "quantitative", "title": "Infláció (%)", "axis": { "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" } },
+    "color": {
+      "field": "Típus",
+      "type": "nominal",
+      "scale": { "range": ["#ffcc00", "#38bdf8", "#f87171"] },
+      "legend": { "title": "Kategória", "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" }
+    },
+    "tooltip": [
+      { "field": "year", "type": "ordinal", "title": "Év" },
+      { "field": "Típus", "type": "nominal", "title": "Típus" },
+      { "field": "Érték", "type": "quantitative", "title": "Infláció (%)", "format": ".1f" }
+    ]
+  },
+  "config": baseConfig
+};
+
+const fuelIndex = {
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "width": "container",
+  "height": 380,
+  "background": "transparent",
+  "title": { "text": "Románia üzemanyagár-indexe", "fontSize": 14, "fontWeight": "bold", "color": "#f1f5f9" },
+  "data": {
+    "values": [
+      { "year": 2017, "index": 100 },
+      { "year": 2018, "index": 106 },
+      { "year": 2019, "index": 112 },
+      { "year": 2020, "index": 101 },
+      { "year": 2021, "index": 132 },
+      { "year": 2022, "index": 186 },
+      { "year": 2023, "index": 168 },
+      { "year": 2024, "index": 173 },
+      { "year": 2026, "index": 198 }
+    ]
+  },
+  "mark": { "type": "bar", "cornerRadiusTopLeft": 6, "cornerRadiusTopRight": 6, "tooltip": true },
+  "encoding": {
+    "x": { "field": "year", "type": "ordinal", "title": "Év", "axis": { "labelAngle": -45, "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" } },
+    "y": { "field": "index", "type": "quantitative", "title": "Index (2017=100)", "axis": { "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" } },
+    "color": {
+      "field": "index",
+      "type": "quantitative",
+      "scale": { "scheme": "goldorange" },
+      "legend": { "title": "Index", "labelColor": "#cbd5e1", "titleColor": "#f1f5f9" }
+    },
+    "tooltip": [
+      { "field": "year", "type": "ordinal", "title": "Év" },
+      { "field": "index", "type": "quantitative", "title": "Index", "format": ".0f" }
+    ]
+  },
+  "config": baseConfig
+};
+
+vegaEmbed('#viz1', dieselPrices, {actions: false});
+vegaEmbed('#viz2', fuelCompare, {actions: false});
+vegaEmbed('#viz3', energyInflation, {actions: false});
+vegaEmbed('#viz4', fuelIndex, {actions: false});
+
+// ==========================================
+// GRAFIKON NYOMOZAŚOK LOGIKÁJA
+// ==========================================
+const explanations = {
+  1: {
+    success: "✓ Kiváló meglátás! A COVID-19 miatti globális karantén alatt az autók leálltak, a gyárak bezártak, a nyersolaj világpiaci ára pedig szabadesésbe kezdett.",
+    error: "✘ Nem pontos. Gondolj bele: 2020 tavaszán a világjárvány miatt mindenki otthon maradt, így senki sem vásárolt üzemanyagot."
+  },
+  2: {
+    success: "✓ Pontosan! Az ukrajnai háború kitörése utáni embargók miatt brutális és tartós gázolajhiány lépett fel az európai piacon.",
+    error: "✘ Nem így történt. Az igazi ok geopolitikai: az ukrajnai háború miatti szankciók megbénították az európai dízelimportot."
+  },
+  3: {
+    success: "✓ Így van! Az orosz gázszállítások leállása pánikot okozott az európai energiapiacon, ami rántotta magával a kitermelési költségeket is.",
+    error: "✘ Ez nem igaz. A valódi ok az ukrajnai konfliktus folyományaként kialakuló összeurópai gáz- és áramválság volt."
+  },
+  4: {
+    success: "✓ Pontos válasz! A makacs infláció beépült a logisztikába, amit a román kormány több lépcsős jövedékiadó- és áfa-emeléssel tetézett.",
+    error: "✘ Nem talált. A tartósan magas index mögött a belföldi adóemelések és az általános gazdasági infláció húzódik meg."
+  }
+};
+
+function playGame(chartId, isCorrect) {
+  const feedbackDiv = document.getElementById(`feedback-${chartId}`);
+  const card = feedbackDiv.closest('.mini-game');
+  const buttons = card.querySelectorAll('.inline-btn');
+  buttons.forEach(btn => btn.disabled = true);
+  feedbackDiv.style.display = "block";
+  if (isCorrect) {
+    feedbackDiv.className = "inline-feedback success";
+    feedbackDiv.innerText = explanations[chartId].success;
+  } else {
+    feedbackDiv.className = "inline-feedback error";
+    feedbackDiv.innerText = explanations[chartId].error;
+  }
+}
+
+// ==========================================
+// TANKOLÁS LOGIKA
+// ==========================================
+let draggedFuelType = null;
+const prices2026 = { benzin: 9.14, diesel: 9.50 };
+
+const nozzles = document.querySelectorAll('.nozzle');
+const slots = document.querySelectorAll('.car-slot');
+const alertBox = document.getElementById('game-alert');
+
+nozzles.forEach(nozzle => {
+  nozzle.addEventListener('dragstart', (e) => {
+    draggedFuelType = nozzle.id.replace('nozzle-', '');
+  });
+});
+
+slots.forEach(slot => {
+  slot.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    slot.classList.add('hovered');
+  });
+
+  slot.addEventListener('dragleave', () => {
+    slot.classList.remove('hovered');
+  });
+
+  slot.addEventListener('drop', (e) => {
+    e.preventDefault();
+    slot.classList.remove('hovered');
+    const targetCarType = slot.getAttribute('data-target');
+
+    if (draggedFuelType === targetCarType) {
+      triggerFueling(targetCarType);
+    } else {
+      triggerFailure(draggedFuelType, targetCarType);
+    }
+  });
+});
+
+function triggerFueling(type) {
+  alertBox.style.display = "block";
+  alertBox.style.background = "rgba(46, 204, 113, 0.2)";
+  alertBox.style.border = "1px solid #2ecc71";
+  alertBox.style.color = "#2ecc71";
+  alertBox.innerText = `✓ Megfelelő üzemanyag! Megkezdődik a tankolás...`;
+
+  let currentLiters = 0;
+  const targetLiters = 50; 
+  const rate = prices2026[type];
+  
+  document.getElementById('disp-rate').innerText = `${rate.toFixed(2)} RON`;
+
+  const interval = setInterval(() => {
+    if (currentLiters >= targetLiters) {
+      clearInterval(interval);
+      const finalCost = targetLiters * rate;
+      alertBox.innerText = `✓ Kész! Tele a tank (${targetLiters}L). Ez összesen ${finalCost.toFixed(2)} RON-ba került!`;
+    } else {
+      currentLiters += 1.25;
+      const totalCost = currentLiters * rate;
+      document.getElementById('disp-liters').innerText = `${currentLiters.toFixed(2)} L`;
+      document.getElementById('disp-total').innerText = `${totalCost.toFixed(2)} RON`;
+    }
+  }, 40);
+}
+
+function triggerFailure(fuel, car) {
+  alertBox.style.display = "block";
+  alertBox.style.background = "rgba(231, 76, 60, 0.2)";
+  alertBox.style.border = "1px solid #e74c3c";
+  alertBox.style.color = "#e74c3c";
+  alertBox.innerText = `🛑 FIGYELEM! ${fuel.toUpperCase()} üzemanyagot próbálsz tölteni a ${car.toUpperCase()} autóba! Ez tönkreteszi a motort!`;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  document.body.classList.add('is-locked');
+  window.scrollTo(0, 0);
+
+  const btn = document.getElementById('view-viz-btn');
+  const vizSection = document.getElementById('vizualizaciok');
+
+  if (btn && vizSection) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      document.body.classList.remove('is-locked');
+      vizSection.scrollIntoView({ behavior: 'smooth' });
+    });
+  }
+});
+</script>
+
+</body>
+</html>
